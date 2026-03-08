@@ -1,8 +1,5 @@
 name: action-bump-cli
-description: >
-  Bump semantic version in any file using the bump CLI (github.com/mattn/bump).
-  Supports major/minor/patch increments or setting an explicit version.
-  Works with any file format via regex pattern matching.
+description: Bump semantic version in any file using bump CLI with regex patterns.
 author: supermomonga
 
 branding:
