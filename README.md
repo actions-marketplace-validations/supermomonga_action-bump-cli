@@ -28,16 +28,70 @@ Since it uses regex patterns to locate version strings, it works with any file f
 
 ## Quick Start
 
-```yaml
-- uses: supermomonga/action-bump-cli@v1
-  id: bump
-  with:
-    file: package.json
-    pattern: '"version":\s*"(\d+\.\d+\.\d+)"'
-    release_type: minor
+The following workflow lets you bump the version via **workflow_dispatch** and automatically creates a pull request with the change.
 
-- run: echo "New version: ${{ steps.bump.outputs.version }}"
+```yaml
+# .github/workflows/bump-version.yml
+name: Bump version
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Release type (major, minor, patch). Ignored if version is specified."
+        required: false
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      version:
+        description: "Explicit version to set (e.g. 1.2.3). Takes precedence over release_type."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supermomonga/action-bump-cli@v1
+        id: bump
+        with:
+          file: package.json
+          pattern: '"version":\s*"(\d+\.\d+\.\d+)"'
+          release_type: ${{ inputs.version == '' && inputs.release_type || '' }}
+          version: ${{ inputs.version }}
+
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: release/v${{ steps.bump.outputs.version }}
+          commit-message: "Bump version to ${{ steps.bump.outputs.version }}"
+          title: "Release v${{ steps.bump.outputs.version }}"
+          body: |
+            Bumps version to `${{ steps.bump.outputs.version }}`.
 ```
+
+### Granting PR Creation Permission to GitHub Actions
+
+This workflow requires GitHub Actions to have write access so it can create pull requests. You need to **enable read and write permissions** in your repository settings.
+
+Go to **Settings > Actions > General > Workflow permissions** and select "Read and write permissions", or run the following `gh` command:
+
+```bash
+gh api repos/{owner}/{repo}/actions/permissions/workflow \
+  --method PUT \
+  --field default_workflow_permissions=write \
+  --field can_approve_pull_request_reviews=false
+```
+
+> [!NOTE]
+> Replace `{owner}/{repo}` with your actual repository (e.g. `supermomonga/my-app`).
 
 ## Pattern Examples
 
