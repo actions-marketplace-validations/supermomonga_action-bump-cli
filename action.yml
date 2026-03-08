@@ -1,0 +1,115 @@
+name: action-bump-cli
+description: >
+  Bump semantic version in any file using the bump CLI (github.com/mattn/bump).
+  Supports major/minor/patch increments or setting an explicit version.
+  Works with any file format via regex pattern matching.
+author: supermomonga
+
+branding:
+  icon: arrow-up-circle
+  color: green
+
+inputs:
+  file:
+    description: Path to the file containing the version string to bump.
+    required: true
+  pattern:
+    description: >
+      Regex pattern with exactly one capture group matching the version string.
+      Example for package.json: "version":\s*"(\d+\.\d+\.\d+)"
+    required: true
+  release_type:
+    description: >
+      Semantic version component to increment: major, minor, or patch.
+      Mutually exclusive with the "version" input.
+    required: false
+  version:
+    description: >
+      Explicit version string to set (e.g. "2.0.0").
+      Mutually exclusive with the "release_type" input.
+    required: false
+
+outputs:
+  version:
+    description: The new version after bumping.
+    value: ${{ steps.bump.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      shell: bash
+      env:
+        INPUT_FILE: ${{ inputs.file }}
+        INPUT_PATTERN: ${{ inputs.pattern }}
+        INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        if [[ -z "${INPUT_FILE}" ]]; then
+          echo "::error::Input 'file' is required."
+          exit 1
+        fi
+
+        if [[ -z "${INPUT_PATTERN}" ]]; then
+          echo "::error::Input 'pattern' is required."
+          exit 1
+        fi
+
+        if [[ -n "${INPUT_RELEASE_TYPE}" && -n "${INPUT_VERSION}" ]]; then
+          echo "::error::Inputs 'release_type' and 'version' are mutually exclusive. Provide only one."
+          exit 1
+        fi
+
+        if [[ -z "${INPUT_RELEASE_TYPE}" && -z "${INPUT_VERSION}" ]]; then
+          echo "::error::Either 'release_type' or 'version' must be provided."
+          exit 1
+        fi
+
+        if [[ -n "${INPUT_RELEASE_TYPE}" ]]; then
+          case "${INPUT_RELEASE_TYPE}" in
+            major|minor|patch) ;;
+            *)
+              echo "::error::Invalid release_type '${INPUT_RELEASE_TYPE}'. Must be one of: major, minor, patch."
+              exit 1
+              ;;
+          esac
+        fi
+
+        if [[ -n "${INPUT_VERSION}" ]]; then
+          if ! [[ "${INPUT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version format '${INPUT_VERSION}'. Expected format: X.Y.Z (e.g. 1.2.3)."
+            exit 1
+          fi
+        fi
+
+        if [[ ! -f "${INPUT_FILE}" ]]; then
+          echo "::error::File '${INPUT_FILE}' does not exist."
+          exit 1
+        fi
+
+    - name: Install bump CLI
+      shell: bash
+      run: go install github.com/mattn/bump@latest
+
+    - name: Run bump
+      id: bump
+      shell: bash
+      env:
+        INPUT_FILE: ${{ inputs.file }}
+        INPUT_PATTERN: ${{ inputs.pattern }}
+        INPUT_RELEASE_TYPE: ${{ inputs.release_type }}
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        if [[ -n "${INPUT_VERSION}" ]]; then
+          NEW_VERSION=$(bump set "${INPUT_VERSION}" -f "${INPUT_FILE}" -p "${INPUT_PATTERN}" -w)
+        else
+          NEW_VERSION=$(bump "${INPUT_RELEASE_TYPE}" -f "${INPUT_FILE}" -p "${INPUT_PATTERN}" -w)
+        fi
+
+        if [[ -z "${NEW_VERSION}" ]]; then
+          echo "::error::bump command did not produce a version output."
+          exit 1
+        fi
+
+        echo "New version: ${NEW_VERSION}"
+        echo "version=${NEW_VERSION}" >> "${GITHUB_OUTPUT}"
