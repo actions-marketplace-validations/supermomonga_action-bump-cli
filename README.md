@@ -1,5 +1,7 @@
 # action-bump-cli
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-action--bump--cli-blue?logo=github)](https://github.com/marketplace/actions/action-bump-cli)
+
 A GitHub Action that bumps semantic versions in any file using the [bump](https://github.com/mattn/bump) CLI.
 
 Since it uses regex patterns to locate version strings, it works with any file format.
